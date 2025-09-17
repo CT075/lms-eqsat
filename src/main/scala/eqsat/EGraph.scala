@@ -280,7 +280,10 @@ class EGraph[K](
     }
   }
 
-  final def saturate
+  final def saturate(timeout: Int => Boolean): Int = {
+    System.err.println("TODO: saturation")
+    0
+  }
 }
 
 case class ENode[K](
