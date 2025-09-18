@@ -1,4 +1,4 @@
-package eqsat
+package lms.eqsat
 
 import scala.collection.mutable
 
@@ -66,8 +66,8 @@ trait Analysis[K, A] {
       if (!areEquivalent(c.analysisResult(this), oldResults(c))) {
         println(s"Inconsistent result for $id on $c: ${oldResults(c)} vs ${c.analysisResult(this)}")
         println(c.nodes.map(n => (n, n.hashCode())))
-        println(c.nodes.flatMap(_.args).distinct.map(x => (x, x.analysisResult(this))))
-        println(c.nodes.flatMap(_.args).distinct.map(x => (x, oldResults(x.asInstanceOf[EClass[K]]))))
+        println(c.nodes.flatMap(_.children).distinct.map(x => (x, x.analysisResult(this))))
+        println(c.nodes.flatMap(_.children).distinct.map(x => (x, oldResults(x.asInstanceOf[EClass[K]]))))
         assert(areEquivalent(c.analysisResult(this), oldResults(c)))
       }
     }

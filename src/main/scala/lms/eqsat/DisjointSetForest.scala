@@ -1,4 +1,4 @@
-package eqsat
+package lms.eqsat
 
 import scala.collection.mutable
 
