@@ -2,6 +2,8 @@ package eqsat
 
 import scala.collection.mutable
 
+case class RecNode[K](kind: K, children: Seq[RecNode[K]])
+
 class EGraph[K](
   val analyses: Analyses[K],
   val rebuildAfterMerge: Boolean = false,
@@ -19,9 +21,12 @@ class EGraph[K](
 
   def classes: Seq[EClass[K]] = hashCons.values.toSeq.map(find).distinct.sorted
 
-  def canonicalize(node: ENode[K]): ENode[K] = node.mapArgs(find)
+  def canonicalize(node: ENode[K]): ENode[K] = node.mapChildren(find)
 
-  def add(node: ENode[K]): EClass[K] = {
+  def add(node: RecNode[K]): EClass[K] =
+    addImpl(ENode(node.kind, node.children.map(add)))
+
+  def addImpl(node: ENode[K]): EClass[K] = {
     val canonicalNode = canonicalize(node)
     hashCons.get(canonicalNode) match {
       case Some(existing) => existing
@@ -41,7 +46,7 @@ class EGraph[K](
     cls.nodeSet.add(node)
 
     // Make the node's arguments point to this e-class.
-    for (child <- node.args) {
+    for (child <- node.children) {
       child.parents.append((node, cls))
     }
 
@@ -97,7 +102,7 @@ class EGraph[K](
       newId.nodeSet.add(node)
 
       // Patch up parent lists of child classes.
-      for (arg <- node.args) {
+      for (arg <- node.children) {
         repairWorklist.append(arg)
       }
     }
@@ -105,7 +110,7 @@ class EGraph[K](
     // Patch up parent lists of sibling classes.
     for ((_, parent) <- oldId.parents) {
       for (node <- parent.nodes) {
-        for (arg <- node.args) {
+        for (arg <- node.children) {
           if (find(arg) != newId) {
             repairWorklist.append(arg)
           }
@@ -141,7 +146,7 @@ class EGraph[K](
     while (worklist.nonEmpty) {
       val newWorklist = mutable.ArrayBuffer[EClass[K]]()
       for (eClass <- classes) {
-        val eligibleNodes = eClass.nodes.filter(_.args.forall(_.hasAnalysisResult(analysis)))
+        val eligibleNodes = eClass.nodes.filter(_.children.forall(_.hasAnalysisResult(analysis)))
         val nodeResults = eligibleNodes.map(analysis.make)
         if (nodeResults.nonEmpty) {
           var classResult = nodeResults.reduce(analysis.join)
@@ -253,13 +258,13 @@ class EGraph[K](
       for ((parentNode, parentClass) <- eClass.parents) {
         assert(parentNode == canonicalize(parentNode))
         assert(find(hashCons(parentNode)) == find(parentClass))
-        assert(parentNode.args.contains(eClass))
+        assert(parentNode.children.contains(eClass))
       }
 
       // Check that the nodes set is consistent.
       for (node <- eClass.nodeSet) {
         assert(find(hashCons(node)) == eClass)
-        for (arg <- node.args) {
+        for (arg <- node.children) {
           assert(arg.parents.map(t => (t._1, find(t._2))).contains((node, eClass)))
         }
       }
@@ -269,7 +274,7 @@ class EGraph[K](
   final protected def assertNoDanglingClasses(): Unit = {
     // Hashcons values may be stale (i.e., non-canonical) but the keys must be canonical at all times.
     for (eNode <- hashCons.keys) {
-      for (arg <- eNode.args) {
+      for (arg <- eNode.children) {
         if (arg.stale) {
           println(s"Stale node $eNode with canonical variant ${canonicalize(eNode)} (in class ${hashCons(eNode)})")
           println(s"$arg parents: ${arg.parents}")
@@ -288,10 +293,10 @@ class EGraph[K](
 
 case class ENode[K](
   val kind: K,
-  val args: Seq[EClass[K]],
+  val children: Seq[EClass[K]],
 ) {
-  def mapArgs(f: EClass[K] => EClass[K]): ENode[K] = {
-    ENode[K](kind, args.map(f))
+  def mapChildren(f: EClass[K] => EClass[K]): ENode[K] = {
+    ENode[K](kind, children.map(f))
   }
 }
 
