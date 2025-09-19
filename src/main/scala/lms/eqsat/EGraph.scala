@@ -2,7 +2,7 @@ package lms.eqsat
 
 import scala.collection.mutable
 
-case class RecNode[K](kind: K, children: Seq[RecNode[K]])
+import lms.eqsat.Syntax._
 
 class EGraph[K](
   val analyses: Analyses[K],
@@ -283,11 +283,6 @@ class EGraph[K](
         assert(!arg.stale)
       }
     }
-  }
-
-  final def saturate(timeout: Int => Boolean): Int = {
-    System.err.println("TODO: saturation")
-    0
   }
 }
 

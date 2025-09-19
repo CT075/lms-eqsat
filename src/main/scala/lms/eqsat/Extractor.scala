@@ -3,6 +3,7 @@ package lms.eqsat
 import scala.collection.mutable
 
 import lms.util.Plumbing._
+import lms.eqsat.Syntax._
 
 abstract class Extractor[K](graph: EGraph[K]) {
   type Cost
@@ -36,27 +37,40 @@ abstract class Extractor[K](graph: EGraph[K]) {
       didSomething = false
 
       graph.classes.foreach { cls =>
-        (costs.get(cls), makePass(cls)) match {
-          case (None, Some(n)) => {
-            costs(cls) = n
+        makePass(cls) match {
+          case None => {}
+          case Some(nnew) => {
             didSomething = true
+            costs.updateWith(cls) {
+              case None => Some(nnew)
+              case Some(nold) => Some(Ordering.by[(Cost, ENode[K]), Cost](_._1).min(nold, nnew))
+            }
           }
-          case (Some(nold), Some(nnew)) => {
-            costs(cls) = Ordering.by[(Cost, ENode[K]), Cost](_._1).min(nold, nnew)
-            didSomething = true
-          }
-          case _ => {}
         }
       }
     }
     this.populated = true
   }
 
-  final def extract(cls: EClass[K]): Option[Unit] = {
+  final def extract(root: EClass[K]): FlatTree[K] = {
     if (!this.populated) {
       this.populate()
     }
 
-    assert(this.populated)
+    val cache: mutable.Map[EClass[K], Int] = mutable.Map.empty
+    val nodes: mutable.ArrayBuffer[FlatNode[K]] = mutable.ArrayBuffer.empty
+
+    def walk(cls: EClass[K]): Int = {
+      cache.getOrElse(cls, {
+        val (_, node) = costs(cls)
+        val idx = nodes.length
+        nodes += FlatNode(node.kind, node.children.map(walk))
+        cache(cls) = idx
+        idx
+      })
+    }
+
+    val _ = walk(root)
+    FlatTree(nodes.toVector)
   }
 }
